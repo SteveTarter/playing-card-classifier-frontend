@@ -1,70 +1,126 @@
-# Getting Started with Create React App
+# Card Classifier
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A React-based front end for classifying playing cards using a serverless TensorFlow endpoint (AWS Lambda/SageMaker). Upload an image of a single card (JPEG/PNG), click **Classify**, and view the predicted card name and confidence score.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Image upload & preview**: drag-and-drop or file picker, with client-side type/size validation (max 15 MB).
+- **OffscreenCanvas resizing**: scales your image to 224 × 224 to match model input and minimize payload.
+- **Serverless inference**: sends base64‑encoded PNG to a Lambda/SageMaker endpoint.
+- **Abortable requests**: cancel long-running classifications with a built‑in timeout or **Cancel** button.
+- **Try Again**: resets the UI for another classification round.
+- **Responsive UI**: built with React + react‑bootstrap components.
 
-### `npm start`
+## Screenshots
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+![Screenshot](./Resources/img/Screenshot-2023-07-08.png)
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Prerequisites
 
-### `npm test`
+- Node.js >= 14
+- npm or yarn
+- A deployed TensorFlow classification endpoint (API Gateway + Lambda/SageMaker)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Getting Started
 
-### `npm run build`
+1. **Clone the repo**
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+   ```bash
+   git clone https://github.com/<your‑org>/card-classifier-frontend.git
+   cd card-classifier-frontend
+   ```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+2. **Install dependencies**
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
 
-### `npm run eject`
+3. **Configure your API URL**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+   Create a `.env.development.local` file in the root with your endpoint:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+   ```bash
+   REACT_APP_API_BASE_URL=https://<your-api>.execute-api.<region>.amazonaws.com/dev
+   ```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+   This file is ignored by Git and overrides any `.env` settings.
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+4. **Run in development mode**
 
-## Learn More
+   ```bash
+   npm start
+   # or
+   yarn start
+   ```
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+   The app will open at `http://localhost:3000`.
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+5. **Build for production**
 
-### Code Splitting
+   ```bash
+   npm run build
+   # or
+   yarn build
+   ```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+   Your optimized static files land in `build/`, ready to host on S3, Netlify, GitHub Pages, etc.
 
-### Analyzing the Bundle Size
+## Deploying the Front End
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+You can host the `build/` folder on any static site service. For example, to deploy to GitHub Pages:
 
-### Making a Progressive Web App
+```bash
+npm install -g gh-pages
+npm run build
+gh-pages -d build
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Or upload `build/` to an S3 bucket and serve via CloudFront.
 
-### Advanced Configuration
+## Environment Variables
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+| Variable                 | Description                          |
+| ------------------------ | ------------------------------------ |
+| `REACT_APP_API_BASE_URL` | Base URL for the prediction endpoint |
 
-### Deployment
+## Project Structure
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+```
+src/
+├── App.js               # Main component
+├── CardClassifier.jsx   # Core UI and logic
+├── index.js             # Entry point (CSS imports)
+├── index.css            # Global styles
+├── App.css              # Component overrides
+└── components/          # (optional) shared UI components
+```
 
-### `npm run build` fails to minify
+## Troubleshooting
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+- **Spinner not animating**: ensure your Bootstrap CSS is imported in `src/index.js` *before* any custom CSS:
+  ```js
+  import "bootstrap/dist/css/bootstrap.min.css";
+  import "./index.css";
+  ```
+- **File picker not clearing**: the **Try Again** button resets the internal state and programmatically clears the file input.
+- **CORS errors**: confirm your API Gateway/CORS settings allow `Content-Type: application/json` from your origin.
+
+## Contributing
+
+1. Fork the repo.
+2. Create a feature branch (`git checkout -b feature/XYZ`).
+3. Commit your changes (`git commit -am 'Add XYZ'`).
+4. Push to your branch (`git push origin feature/XYZ`).
+5. Open a pull request.
+
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+Happy classifying!
+
