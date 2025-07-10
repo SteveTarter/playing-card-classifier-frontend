@@ -11,6 +11,9 @@
 # production
 /build
 
+# infra without <TAGS>
+/infra.prod
+
 # misc
 .DS_Store
 .env.local
