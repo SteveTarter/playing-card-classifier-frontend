@@ -20,6 +20,8 @@ export default function CardClassifier() {
   const controllerRef = useRef(null);
   // Offscreen canvas for fixed 224x224 backend upload
   const canvasRef = useRef(new OffscreenCanvas(224, 224));
+  // visible preview
+  const previewCanvasRef = useRef(null);
 
   // Camera capture devices
   const videoRef = useRef(null);
@@ -27,22 +29,55 @@ export default function CardClassifier() {
 
   const fileInputRef = useRef(null);
 
+  // cleanup on unmount
   useEffect(() => {
     return () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current?.getTracks().forEach(track => track.stop());
     };
   }, [previewUrl]);
 
-  // Attach stream to video element when cameraActive changes
+  // Zoom factor for digital zoom
+  const ZOOM = 3; // 2x zoom-in
+
+  // Attach MediaStream to video and start/stop render loop for preview canvas
   useEffect(() => {
-    if (cameraActive && videoRef.current && streamRef.current) {
+    let frameId;
+    if (cameraActive && videoRef.current && previewCanvasRef.current && streamRef.current) {
+      const video = videoRef.current;
+      const canvas = previewCanvasRef.current;
+
+      // attach stream to hidden video for drawing
       videoRef.current.srcObject = streamRef.current;
       const playPromise = videoRef.current.play();
       if (playPromise && playPromise.catch) {
         playPromise.catch(err => console.warn('Video play interrupted', err));
       }
+
+      // once metadata is loaded, adjust canvas to preserve aspect
+      video.onloadedmetadata = () => {
+        const cw = 224;
+        const ch = Math.round((video.videoHeight / video.videoWidth) * cw);
+        canvas.width = cw;
+        canvas.height = ch;
+        canvas.style.width = `${cw}px`;
+        canvas.style.height = `${ch}px`;
+      };
+
+      // draw loop into canvas
+      const draw = () => {
+        const ctx = canvas.getContext('2d');
+        const sw = video.videoWidth / ZOOM;
+        const sh = video.videoHeight / ZOOM;
+        const sx = (video.videoWidth - sw) / 2;
+        const sy = (video.videoHeight - sh) / 2;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+        frameId = requestAnimationFrame(draw);
+      };
+      draw();
     }
+    return () => cancelAnimationFrame(frameId);
   }, [cameraActive]);
 
   // Handle file selection with type/size checks
@@ -67,13 +102,23 @@ export default function CardClassifier() {
   // Open the device camera
   const openCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // Request high-res with continuous autofocus
+      const constraints = {
+        video: {
+          facingMode: 'environment',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          focusMode: 'continuous', // may work on some devices
+          zoom: true // allow zoom capability
+        }
+      };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
       streamRef.current = stream;
       setCameraActive(true);
       setError(null);
     } catch (err) {
-      console.error('Camera access error:', err);
-      setError('Unable to access camera. Please check permissions.');
+      console.error('openCamera error', err);
+      setError('Cannot access camera or adjust focus');
     }
   }, []);
 
@@ -81,37 +126,34 @@ export default function CardClassifier() {
   const capturePhoto = useCallback(async () => {
     try {
       const video = videoRef.current;
-      // 1) capture full-res preview
-      const previewCanvas = document.createElement('canvas');
-      previewCanvas.width = video.videoWidth;
-      previewCanvas.height = video.videoHeight;
-      const pctx = previewCanvas.getContext('2d');
-      pctx.drawImage(video, 0, 0, previewCanvas.width, previewCanvas.height);
-      const previewBlob = await new Promise(resolve => previewCanvas.toBlob(resolve, 'image/png'));
-      const previewURL = URL.createObjectURL(previewBlob);
-      setPreviewUrl(previewURL);
+      // generate preview via the visible canvas
+      const previewCanvas = previewCanvasRef.current;
+      if (previewCanvas) {
+        previewCanvas.toBlob(blob => {
+          setPreviewUrl(URL.createObjectURL(blob));
+        }, 'image/png');
+      }
       setResult(null);
 
-      // 2) prepare fixed-224x224 for backend
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const blob = await canvas.convertToBlob({ type: 'image/png' });
-      const capturedFile = new File([blob], 'capture.png', { type: 'image/png' });
-      setFile(capturedFile);
-    } catch (err) {
-      console.error('Capture error:', err);
-      setError('Failed to capture image.');
+      // generate backend image at 224x224
+      const backendCanvas = canvasRef.current;
+      const ctx = backendCanvas.getContext('2d');
+      ctx.clearRect(0,0,backendCanvas.width,backendCanvas.height);
+      ctx.drawImage(video, 0, 0, backendCanvas.width, backendCanvas.height);
+      const blob = await backendCanvas.convertToBlob({ type: 'image/png' });
+      setFile(new File([blob], 'capture.png', { type: 'image/png' }));
+    } catch (e) {
+      console.error('capture error', e);
+      setError('Capture failed');
     } finally {
-      if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current?.getTracks().forEach(t => t.stop());
       setCameraActive(false);
     }
   }, []);
 
   // Close the camera
   const closeCamera = useCallback(() => {
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+    streamRef.current?.getTracks().forEach(track => track.stop());
     setCameraActive(false);
   }, []);
 
@@ -124,18 +166,19 @@ export default function CardClassifier() {
     // Prepare AbortController
     const controller = new AbortController();
     controllerRef.current = controller;
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-
+      // Draw image into 224×224 canvas first
       const imgBitmap = await createImageBitmap(file);
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
+      const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(imgBitmap, 0, 0, canvas.width, canvas.height);
 
-      // Convert the image into a Base64 string.
-      const buffer = await new Response(file).arrayBuffer();
+      // Convert resized image into Base64
+      const blob = await new Promise(resolve => canvas.convertToBlob({ type: 'image/png' }).then(resolve));
+      const buffer = await blob.arrayBuffer();
       const base64 = btoa(
         new Uint8Array(buffer).reduce((str, byte) => str + String.fromCharCode(byte), "")
       );
@@ -165,9 +208,13 @@ export default function CardClassifier() {
       });
     } catch (err) {
       if (err.name !== "AbortError") {
-        console.error("Classification error:", err);
-        setError("Failed to classify.");
+        setError("Request timed out.");
+      } else if (err.message.includes('blocked by CORS')) {
+        setError('CORS error: please enable CORS on the backend or use a proxy.');
+      } else {
+        setError(err.message || 'Failed to classify.');
       }
+      console.error("Classification error:", err);
     } finally {
       setLoading(false);
       controllerRef.current = null;
@@ -207,17 +254,20 @@ export default function CardClassifier() {
       </Card>
 
       {cameraActive ? (
-        <Row className="justify-content-center mb-3 text-center">
-          <Col xs="auto">
+        <Row className="justify-content-center mb-3">
+          <Col xs="auto" className="text-center">
             <video
               ref={videoRef}
-              width={224}
-              height={224}
+              style={{ display: 'none' }}
               autoPlay
               muted
               playsInline
+            />
+            <canvas
+              ref={previewCanvasRef}
+              width={224}
+              height={224}
               className="border rounded"
-              style={{ objectFit: 'cover' }}
             />
             <div className="mt-2">
               <Button onClick={capturePhoto} variant="primary" className="me-2">Capture</Button>
@@ -225,43 +275,54 @@ export default function CardClassifier() {
             </div>
           </Col>
         </Row>
-      ) : previewUrl ? (
+      ) : (
+        <>
         <Row className="justify-content-center mb-3 text-center">
-          <Col xs="auto" className="position-relative">
-            <img src={previewUrl} alt="Card preview" style={{ maxWidth: 224, maxHeight: 224 }} className="border rounded" />
+          {previewUrl ? (
+          <Col xs="auto">
+            <img
+              src={previewUrl}
+              alt="Card preview"
+              style={{ maxWidth: 224, maxHeight: 224 }}
+              className="border rounded"
+            />
             {loading && (
-              <Spinner animation="border" role="status" variant="light" size="md" style={{position:"absolute",top:"50%",left:"50%",width:"2rem",height:"2rem",marginTop:"-1rem",marginLeft:"-1rem"}} />
+              <Spinner
+                animation="border"
+                role="status"
+                variant="light"
+                size="md"
+                style={{position:"absolute",top:"50%",left:"50%",width:"2rem",height:"2rem",marginTop:"-1rem",marginLeft:"-1rem"}}
+              />
             )}
           </Col>
-          <Col xs={12} className="mt-2">
-            {file.name}
-          </Col>
-        </Row>
-      ) : (
-        <Row className="justify-content-center mb-3">
-          <Col xs="auto">
-            <Form.Control ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} />
-          </Col>
-          <Col xs="auto">
-            <Button onClick={openCamera} variant="primary">Use Camera</Button>
-          </Col>
-        </Row>
+            ) : (
+              <>
+                <Col xs="auto">
+                  <Form.Control ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} />
+                </Col>
+                <Col xs="auto">
+                  <Button onClick={openCamera} variant="primary">Use Camera</Button>
+                </Col>
+              </>
+            )}
+          </Row>
+          {file && (
+            <Row className="justify-content-center mb-3">
+              <Col xs="auto">
+                <Button onClick={handleActionClick} variant="primary">
+                  {loading ? 'Cancel' : result ? 'Try Again' : 'Classify'}
+                </Button>
+              </Col>
+            </Row>
+          )}
+        </>
       )}
 
-      {file && (
-        <Row className="justify-content-center mb-3">
-          <Col xs="auto">
-            <Button onClick={handleActionClick} variant={loading ? "outline-danger" : "primary"}>
-              {loading ? "Cancel" : result ? "Try Again" : "Classify"}
-            </Button>
-          </Col>
-        </Row>
-      )}
+      {error && <p className="text-danger text-center">{error}</p>}
 
-      {error && <p className="text-danger text-center mt-3">{error}</p>}
-
-      {result && !result.error && (
-        <Card bg="light" className="text-center">
+      {result && (
+        <Card bg="dark" text="light" className="text-center">
           <Card.Body>
             <Card.Title>Prediction: {result.label}</Card.Title>
             <Card.Text>Confidence: {result.confidence}%</Card.Text>
