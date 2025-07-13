@@ -56,12 +56,29 @@ export default function CardClassifier() {
 
       // once metadata is loaded, adjust canvas to preserve aspect
       video.onloadedmetadata = () => {
-        const cw = 224;
-        const ch = Math.round((video.videoHeight / video.videoWidth) * cw);
-        canvas.width = cw;
-        canvas.height = ch;
-        canvas.style.width = `${cw}px`;
-        canvas.style.height = `${ch}px`;
+        // Set canvas internal drawing dimensions to match video stream's intrinsic dimensions.
+        // This ensures the drawImage operation is always 1:1 with the video's aspect ratio
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Now, control the display size using CSS to fit within a 224x224 container
+        // while maintaining aspect ratio.
+        const maxDisplaySize = 224;
+        const videoAspectRatio = video.videoWidth / video.videoHeight;
+
+        let displayWidth, displayHeight;
+
+        if (videoAspectRatio > 1) { // Landscape video (width > height)
+          displayWidth = maxDisplaySize;
+          displayHeight = maxDisplaySize / videoAspectRatio;
+        } else { // Portrait or square video (height >= width)
+          displayHeight = maxDisplaySize;
+          displayWidth = maxDisplaySize * videoAspectRatio;
+        }
+
+        // Set the canvas's CSS style dimensions, rounding to avoid sub-pixel issues
+        canvas.style.width = `${Math.round(displayWidth)}px`;
+        canvas.style.height = `${Math.round(displayHeight)}px`;
       };
 
       // draw loop into canvas
@@ -262,8 +279,6 @@ export default function CardClassifier() {
             />
             <canvas
               ref={previewCanvasRef}
-              width={224}
-              height={224}
               className="border rounded"
             />
             <div className="mt-2">
