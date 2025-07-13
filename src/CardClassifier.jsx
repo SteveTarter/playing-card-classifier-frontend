@@ -84,11 +84,15 @@ export default function CardClassifier() {
       // draw loop into canvas
       const draw = () => {
         const ctx = canvas.getContext('2d');
+        // Calculate source rectangle for the zoomed-in portion of the video
         const sw = video.videoWidth / ZOOM;
         const sh = video.videoHeight / ZOOM;
         const sx = (video.videoWidth - sw) / 2;
         const sy = (video.videoHeight - sh) / 2;
+
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Draw the zoomed portion of the video onto the canvas,
+        // scaling it to fill the canvas's internal dimensions.
         ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
         frameId = requestAnimationFrame(draw);
       };
@@ -235,6 +239,7 @@ export default function CardClassifier() {
     }
   }, [file, cameraActive]);
 
+  // Handles the existing "Cancel" (abort) and "Try Again" (reset) actions
   const handleActionClick = () => {
     if (loading) {
       controllerRef.current?.abort();
@@ -248,6 +253,15 @@ export default function CardClassifier() {
       if (fileInputRef.current) fileInputRef.current.value = "";
     } else classifyCard();
   };
+
+  // New function to clear the selected image and reset the state
+  const handleClearSelection = useCallback(() => {
+    setFile(null);
+    setPreviewUrl(null);
+    setResult(null);
+    setError(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
 
   return (
     <Container className="py-4">
@@ -324,9 +338,19 @@ export default function CardClassifier() {
           {file && (
             <Row className="justify-content-center mb-3">
               <Col xs="auto">
-                <Button onClick={handleActionClick} variant="primary">
-                  {loading ? 'Cancel' : result ? 'Try Again' : 'Classify'}
-                </Button>
+                {loading ? (
+                  // Show "Cancel" button if classification is in progress
+                  <Button onClick={handleActionClick} variant="primary">Cancel</Button>
+                ) : result ? (
+                  // Show "Try Again" button if a result is displayed
+                  <Button onClick={handleActionClick} variant="primary">Try Again</Button>
+                ) : (
+                  // Show "Classify" and "Cancel" buttons if a file is selected and not yet classified
+                  <>
+                    <Button onClick={classifyCard} variant="primary" className="me-2">Classify</Button>
+                    <Button onClick={handleClearSelection} variant="secondary">Cancel</Button>
+                  </>
+                )}
               </Col>
             </Row>
           )}
