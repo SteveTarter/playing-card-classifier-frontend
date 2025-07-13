@@ -125,23 +125,16 @@ export default function CardClassifier() {
   // Capture a photo from the camera
   const capturePhoto = useCallback(async () => {
     try {
-      const video = videoRef.current;
       // generate preview via the visible canvas
       const previewCanvas = previewCanvasRef.current;
       if (previewCanvas) {
         previewCanvas.toBlob(blob => {
           setPreviewUrl(URL.createObjectURL(blob));
+          // set the zoomed blob as file for classification
+          setFile(new File([blob], 'capture.png', { type: 'image/png' }));
         }, 'image/png');
       }
       setResult(null);
-
-      // generate backend image at 224x224
-      const backendCanvas = canvasRef.current;
-      const ctx = backendCanvas.getContext('2d');
-      ctx.clearRect(0,0,backendCanvas.width,backendCanvas.height);
-      ctx.drawImage(video, 0, 0, backendCanvas.width, backendCanvas.height);
-      const blob = await backendCanvas.convertToBlob({ type: 'image/png' });
-      setFile(new File([blob], 'capture.png', { type: 'image/png' }));
     } catch (e) {
       console.error('capture error', e);
       setError('Capture failed');
@@ -159,9 +152,10 @@ export default function CardClassifier() {
 
   // Main classify routine
   const classifyCard = useCallback(async () => {
-    if (!file || !API_BASE_URL) return;
+    if ((!file && !previewCanvasRef.current) || !API_BASE_URL) return;
     setLoading(true);
     setResult(null);
+    setError(null);
 
     // Prepare AbortController
     const controller = new AbortController();
@@ -169,19 +163,22 @@ export default function CardClassifier() {
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
     try {
-      // Draw image into 224×224 canvas first
-      const imgBitmap = await createImageBitmap(file);
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(imgBitmap, 0, 0, canvas.width, canvas.height);
-
-      // Convert resized image into Base64
-      const blob = await new Promise(resolve => canvas.convertToBlob({ type: 'image/png' }).then(resolve));
-      const buffer = await blob.arrayBuffer();
-      const base64 = btoa(
-        new Uint8Array(buffer).reduce((str, byte) => str + String.fromCharCode(byte), "")
-      );
+      // If the user uploaded a file, redraw that into the offscreen canvas and grab its dataURL.
+      // Otherwise (camera flow), grab the dataURL from the preview canvas.
+      let dataUrl;
+      if (file && !cameraActive) {
+        const imgBitmap = await createImageBitmap(file);
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvasRef.current.width;
+        tempCanvas.height = canvasRef.current.height;
+        const tctx = tempCanvas.getContext('2d');
+        tctx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tctx.drawImage(imgBitmap, 0, 0, tempCanvas.width, tempCanvas.height);
+        dataUrl = tempCanvas.toDataURL('image/png');
+      } else {
+        dataUrl = previewCanvasRef.current.toDataURL('image/png');
+      }
+      const base64 = dataUrl.split(',')[1];
 
       // Send the image to the ML.
       const res = await fetch(
@@ -219,7 +216,7 @@ export default function CardClassifier() {
       setLoading(false);
       controllerRef.current = null;
     }
-  }, [file]);
+  }, [file, cameraActive]);
 
   const handleActionClick = () => {
     if (loading) {
