@@ -239,13 +239,13 @@ export default function CardClassifier() {
       <Card className="mb-4">
         <Card.Body>
           <Card.Text>
-            This simple app uses a trained TensorFlow model running on a serverless endpoint to identify playing cards from a photo.
+            This app uses a trained TensorFlow model running on a serverless endpoint to identify playing cards from a photo.
           </Card.Text>
           <Card.Text>
-            To get started, click <strong>Choose File</strong> or <strong>Use Camera</strong>, then select or capture an image of a single card (JPEG or PNG, under 15 MB). Once ready, hit <strong>Classify</strong>.
+            To get started, click <strong>Choose File</strong> or <strong>Use Camera</strong>. Once ready, hit <strong>Classify</strong>.
           </Card.Text>
           <Card.Text>
-            Feel free to <strong>Cancel</strong> any in-flight request, or click <strong>Try Again</strong> after a result to reset.
+            Click <strong>Try Again</strong> after a result to reset.
           </Card.Text>
         </Card.Body>
       </Card>
@@ -277,21 +277,23 @@ export default function CardClassifier() {
         <Row className="justify-content-center mb-3 text-center">
           {previewUrl ? (
           <Col xs="auto">
-            <img
-              src={previewUrl}
-              alt="Card preview"
-              style={{ maxWidth: 224, maxHeight: 224 }}
-              className="border rounded"
-            />
-            {loading && (
-              <Spinner
-                animation="border"
-                role="status"
-                variant="light"
-                size="md"
-                style={{position:"absolute",top:"50%",left:"50%",width:"2rem",height:"2rem",marginTop:"-1rem",marginLeft:"-1rem"}}
+            <div style={{ position: 'relative', display: 'inline-block' }}>
+              <img
+                src={previewUrl}
+                alt="Card preview"
+                style={{ maxWidth: 224, maxHeight: 224 }}
+                className="border rounded"
               />
-            )}
+              {loading && (
+                <Spinner
+                  animation="border"
+                  role="status"
+                  variant="light"
+                  size="md"
+                  style={{position:"absolute",top:"50%",left:"50%",width:"2rem",height:"2rem",marginTop:"-1rem",marginLeft:"-1rem"}}
+                />
+              )}
+            </div>
           </Col>
             ) : (
               <>
