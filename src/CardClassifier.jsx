@@ -270,13 +270,7 @@ export default function CardClassifier() {
       <Card className="mb-4">
         <Card.Body>
           <Card.Text>
-            This app uses a trained TensorFlow model running on a serverless endpoint to identify playing cards from a photo.
-          </Card.Text>
-          <Card.Text>
-            To get started, click <strong>Choose File</strong> or <strong>Use Camera</strong>. Once ready, hit <strong>Classify</strong>.
-          </Card.Text>
-          <Card.Text>
-            Click <strong>Try Again</strong> after a result to reset.
+            This app tries to "guess" a playing card from an image.  Click <strong>Choose File</strong> or <strong>Use Camera</strong> to supply a playing card image.
           </Card.Text>
         </Card.Body>
       </Card>
