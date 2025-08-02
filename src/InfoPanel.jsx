@@ -8,10 +8,8 @@ export default function InfoPanel({ activeSection }) {
     <Container className="py-4">
       <Card className="mb-4">
         <Card.Body>
-          <Card.Text>
-            <h4>{title}</h4>
-            {children}
-          </Card.Text>
+          <h4>{title}</h4>
+          <div>{children}</div>
         </Card.Body>
       </Card>
     </Container>
