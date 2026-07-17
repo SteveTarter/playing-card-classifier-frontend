@@ -1,8 +1,15 @@
 # Playing Card Classifier Frontend
 
+> [!IMPORTANT]
+> **Deprecated Repository**: This codebase has been consolidated into the unified monorepo: **[playing-card-classifier](https://github.com/SteveTarter/playing-card-classifier)**.
+>
+> Active development, issues, and PRs have moved to the [`frontend/` subdirectory](https://github.com/SteveTarter/playing-card-classifier/tree/main/frontend) of the new repository. Please direct all future contributions there.
+
+***
+
 A React-based frontend for classifying playing cards using a serverless TensorFlow endpoint (AWS Lambda/SageMaker). Upload an image of a single card (JPEG/PNG), click **Classify**, and view the predicted card name and confidence score.
 
-The backend is documented in a sister project, [Playing Card Classifier](https://github.com/SteveTarter/playing-card-classifier). 
+The codebase is now maintained in the consolidated monorepo. 
 
 ## Features
 
